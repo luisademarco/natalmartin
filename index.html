@@ -249,7 +249,7 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
       <h2>Links de cada um</h2>
       <p class="warn note">Não abra esses links: cada um revela quem a pessoa tirou. Copie e mande no privado de cada um.</p>
       <ul class="list" id="links"></ul>
-      <button class="ghost small" id="redoBtn">Sortear de novo</button>
+      <button class="ghost small" id="redoBtn">Zerar e sortear de novo</button>
     </div>
   </section>
 </main>
@@ -301,26 +301,104 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
   function save(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {} }
 
   /* ---------- Som ---------- */
-  let soundOn = true, actx = null;
+  let soundOn = true, actx = null, fx = null;
   try { soundOn = localStorage.getItem(KEY + ":som") !== "off"; } catch (e) {}
-  function paintSound() { const b = $("sound"); b.textContent = soundOn ? "🔔" : "🔕"; b.setAttribute("aria-pressed", String(soundOn)); b.setAttribute("aria-label", soundOn ? "Som ligado" : "Som desligado"); }
-  $("sound").addEventListener("click", () => { soundOn = !soundOn; try { localStorage.setItem(KEY + ":som", soundOn ? "on" : "off"); } catch (e) {} paintSound(); if (soundOn) tone(880, .08, "triangle", .08); });
+  function ctx() {
+    if (!actx) {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      fx = actx.createGain(); fx.gain.value = 1; fx.connect(actx.destination);
+    }
+    if (actx.state === "suspended") actx.resume();
+    return actx;
+  }
+  function paintSound() { const b = $("sound"); b.textContent = soundOn ? "🔔" : "🔕"; b.setAttribute("aria-pressed", String(soundOn)); b.setAttribute("aria-label", soundOn ? "Som e música ligados" : "Som e música desligados"); }
+  $("sound").addEventListener("click", (e) => {
+    e.stopPropagation();
+    soundOn = !soundOn; try { localStorage.setItem(KEY + ":som", soundOn ? "on" : "off"); } catch (err) {}
+    paintSound();
+    if (soundOn) { tone(880, .08, "triangle", .08); music.start(); } else music.stop();
+  });
   paintSound();
   function tone(freq, dur, type, vol, when) {
     if (!soundOn) return;
     try {
-      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-      const t = actx.currentTime + (when || 0);
-      const o = actx.createOscillator(), g = actx.createGain();
+      const c = ctx(), t = c.currentTime + (when || 0);
+      const o = c.createOscillator(), g = c.createGain();
       o.type = type || "sine"; o.frequency.setValueAtTime(freq, t);
       g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol || .08, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
-      o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + .05);
+      o.connect(g).connect(fx); o.start(t); o.stop(t + dur + .05);
     } catch (e) {}
   }
   function jingle() {
-    [659, 659, 659, 0, 659, 659, 659, 0, 659, 784, 523, 587, 659].forEach((f, i) => { if (f) tone(f, .22, "triangle", .09, i * .13); });
-    [1319, 1568, 2093].forEach((f, i) => tone(f, .5, "sine", .04, 1.75 + i * .08));
+    music.duck(2.2);
+    [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .35, "triangle", .08, i * .09));
+    [1047, 1319, 1568, 2093].forEach((f) => tone(f, 1.4, "sine", .035, .5));
+    [2093, 2637, 3136].forEach((f, i) => tone(f, .4, "sine", .025, .7 + i * .12));
   }
+
+  /* ---------- Música: "Jingle Bells" (James Lord Pierpont, 1857) em caixinha de música ---------- */
+  const music = (function () {
+    const F = { C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, C3: 130.81, D3: 146.83, F3: 174.61, G3: 196, A3: 220 };
+    // [nota, duração em colcheias]
+    const L1 = [["E5",2],["E5",2],["E5",4], ["E5",2],["E5",2],["E5",4], ["E5",2],["G5",2],["C5",3],["D5",1], ["E5",8]];
+    const L2 = [["F5",2],["F5",2],["F5",3],["F5",1], ["F5",2],["E5",2],["E5",2],["E5",1],["E5",1], ["E5",2],["D5",2],["D5",2],["E5",2], ["D5",4],["G5",4]];
+    const L4 = [["F5",2],["F5",2],["F5",3],["F5",1], ["F5",2],["E5",2],["E5",2],["E5",1],["E5",1], ["G5",2],["G5",2],["F5",2],["D5",2], ["C5",8]];
+    const MEL = [...L1, ...L2, ...L1, ...L4];
+    const CH = { C: ["C3","G3"], F: ["F3","C3"], G: ["G3","D3"], D: ["D3","A3"] };
+    const BARS = ["C","C","C","C","F","C","D","G","C","C","C","C","F","C","G","C"];
+    const E = .2, LEN = 128, REST = 8;
+    const notes = []; let pos = 0;
+    MEL.forEach(([n, d]) => { notes.push({ f: F[n], at: pos, v: .05 }); pos += d; });
+    BARS.forEach((c, i) => { notes.push({ f: F[CH[c][0]], at: i * 8, v: .03, bass: true }); notes.push({ f: F[CH[c][1]], at: i * 8 + 4, v: .025, bass: true }); });
+    notes.sort((a, b) => a.at - b.at);
+    let bus = null, playing = false, timer = null, loopStart = 0, idx = 0;
+    function pluck(f, t, v, bass) {
+      const c = actx;
+      [[1, 1], [2, .35], [4.01, .12]].forEach(([mult, amp]) => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = "sine"; o.frequency.value = f * mult;
+        const dur = bass ? 2.2 : 1.6 / mult;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v * amp, t + .006); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+        o.connect(g).connect(bus); o.start(t); o.stop(t + dur + .05);
+      });
+    }
+    function schedule() {
+      const now = actx.currentTime;
+      while (true) {
+        if (idx >= notes.length) { idx = 0; loopStart += (LEN + REST) * E; }
+        const n = notes[idx], t = loopStart + n.at * E;
+        if (t > now + .6) break;
+        if (t >= now - .05) pluck(n.f, t, n.v, n.bass);
+        idx++;
+      }
+    }
+    return {
+      start() {
+        if (!soundOn || playing) return;
+        try {
+          const c = ctx();
+          if (!bus) { bus = c.createGain(); bus.connect(c.destination); }
+          bus.gain.cancelScheduledValues(c.currentTime); bus.gain.setValueAtTime(0, c.currentTime); bus.gain.linearRampToValueAtTime(1, c.currentTime + 2);
+          playing = true; idx = 0; loopStart = c.currentTime + .15;
+          schedule(); timer = setInterval(schedule, 150);
+        } catch (e) {}
+      },
+      stop() {
+        if (!playing) return;
+        playing = false; clearInterval(timer);
+        try { bus.gain.cancelScheduledValues(actx.currentTime); bus.gain.setTargetAtTime(0, actx.currentTime, .15); } catch (e) {}
+      },
+      duck(sec) {
+        if (!playing) return;
+        const t = actx.currentTime;
+        bus.gain.cancelScheduledValues(t); bus.gain.setTargetAtTime(.15, t, .1); bus.gain.setTargetAtTime(1, t + sec, .6);
+      }
+    };
+  })();
+  // A música começa no primeiro toque na página (os navegadores não deixam tocar antes disso)
+  function firstTouch() { removeEventListener("pointerdown", firstTouch); removeEventListener("keydown", firstTouch); if (soundOn) music.start(); }
+  addEventListener("pointerdown", firstTouch); addEventListener("keydown", firstTouch);
+  document.addEventListener("visibilitychange", () => { if (!actx) return; if (document.hidden) actx.suspend(); else actx.resume(); });
 
   /* ---------- Neve ---------- */
   (function snow() {
@@ -440,9 +518,10 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
   }
   $("drawBtn").addEventListener("click", doDraw);
   $("redoBtn").addEventListener("click", () => {
-    if (confirm("Sortear de novo gera links novos, e os antigos continuam mostrando o sorteio anterior. Você vai precisar mandar os novos pra todo mundo. Quer continuar?")) {
+    if (confirm("Isso apaga o sorteio atual e volta pro botão de sortear. Se você já mandou algum link, os antigos continuam mostrando o sorteio anterior, então vai precisar mandar os novos pra todo mundo. Quer continuar?")) {
       try { localStorage.removeItem(KEY); } catch (e) {}
-      renderLinks(); $("drawPanel").scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" }); doDraw();
+      renderLinks(); $("drawPanel").scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" });
+      toast("Tudo zerado! Pode sortear quando quiser");
     }
   });
 
@@ -482,6 +561,7 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
     $("openHint").style.opacity = 0;
     if (navigator.vibrate) navigator.vibrate(30);
 
+    music.duck(6);
     gift.classList.add("shake");
     for (let k = 0; k < 8; k++) tone(220 + k * 30, .07, "sawtooth", .02, k * .1);
     await sleep(900);
