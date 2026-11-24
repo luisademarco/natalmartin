@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0E2018">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Amigo secreto dos Martin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -52,7 +54,6 @@ p { margin: 0; }
 @keyframes sway { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(1.2deg); } }
 .hero h1 { font-size: clamp(1.8rem, 7vw, 2.4rem); line-height: 1.1; animation: fadeUp .7s .35s both; }
 .hero .sub { color: var(--muted); margin-top: 8px; animation: fadeUp .7s .5s both; }
-.is-reveal .logo { width: min(55%, 210px); }
 .is-reveal .hero { padding-bottom: 16px; }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
@@ -273,10 +274,19 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
   const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const sleep = (ms) => new Promise((r) => setTimeout(r, REDUCED ? 0 : ms));
 
+  /* ---------- Aleatoriedade ---------- */
+  // Inteiro uniforme em [0, max) usando o gerador criptográfico do navegador, com rejeição pra evitar viés de módulo
+  function randInt(max) {
+    if (!(window.crypto && crypto.getRandomValues)) return Math.floor(Math.random() * max);
+    const limit = Math.floor(0x100000000 / max) * max, buf = new Uint32Array(1);
+    do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+    return buf[0] % max;
+  }
+
   /* ---------- Links ---------- */
   function encode(g, r) {
     let salt = "", s = 0;
-    for (let i = 0; i < 4; i++) { const k = Math.floor(Math.random() * 36); salt += A[k]; s += k; }
+    for (let i = 0; i < 4; i++) { const k = randInt(36); salt += A[k]; s += k; }
     return "s-" + salt + A[(g + s) % 36] + A[(r + s * 7 + g * 11) % 36] + A[(g * 5 + r * 3 + s) % 36];
   }
   function decode(hash) {
@@ -293,7 +303,7 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
     let perm;
     do {
       perm = [...Array(n).keys()];
-      for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
+      for (let i = n - 1; i > 0; i--) { const j = randInt(i + 1); [perm[i], perm[j]] = [perm[j], perm[i]]; }
     } while (perm.some((v, i) => v === i));
     return perm.map((r, g) => encode(g, r));
   }
