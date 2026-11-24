@@ -256,6 +256,14 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
       <div class="family" id="names"></div>
       <p class="note">Ninguém tira a si mesmo. Casais podem se tirar.</p>
     </div>
+    <div class="panel stack">
+      <h2>Link da galeria</h2>
+      <p>Um link só com os retratos da família, sem sorteio. Pode mandar no grupo à vontade.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="ghost small" id="galCopy">Copiar link</button>
+        <a class="btn ghost small" id="galWa" target="_blank" rel="noopener">WhatsApp</a>
+      </div>
+    </div>
     <div class="panel stack" id="drawPanel">
       <h2>Sortear</h2>
       <p>O sorteio fica guardado neste navegador. Depois é só mandar o link de cada pessoa no privado.</p>
@@ -746,12 +754,24 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
     $("gPrev").disabled = best === 0; $("gNext").disabled = best === n - 1;
   }
 
+  /* ---------- Link da galeria ---------- */
+  (function () {
+    const url = BASE_URL + "#familia";
+    const msg = "Olha a família Martin toda ilustrada pro nosso Natal! 🎄\n" + url;
+    $("galWa").href = "https://wa.me/?text=" + encodeURIComponent(msg);
+    $("galCopy").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(url); toast("Link da galeria copiado"); }
+      catch (e) { prompt("Copia o link:", url); }
+    });
+  })();
+
   /* ---------- Rotas ---------- */
   function route() {
     const h = (location.hash || "").replace(/^#/, "");
     $("revealView").hidden = true; $("orgView").hidden = true; $("badLink").hidden = true; $("gallery").hidden = true;
     document.body.classList.remove("is-reveal");
     if (!h) { $("orgView").hidden = false; renderFamily(); renderLinks(); renderGallery(); return; }
+    if (h === "familia") { renderGallery(); return; }
     const d = decode(h);
     if (d) { renderReveal(d); renderGallery(); } else $("badLink").hidden = false;
   }
