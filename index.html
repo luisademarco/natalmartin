@@ -163,6 +163,25 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
 .result.show .label { animation: fadeUp .5s both; }
 .result.show .after { animation: fadeUp .6s .9s both; }
 .replay { margin-top: 16px; }
+.rules { margin-top: 22px; text-align: left; display: grid; gap: 12px; }
+.rule { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 16px; background: var(--bg); border: 1px solid var(--line); }
+.rule .ico { font-size: 1.7rem; line-height: 1; flex: none; margin-top: 2px; }
+.rule h3 { font-family: "Young Serif", Georgia, serif; font-weight: 400; font-size: 1.15rem; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rule p { font-size: .95rem; color: var(--muted); }
+.tag { font-family: "Figtree", system-ui, sans-serif; font-size: .75rem; font-weight: 700; color: var(--pine); border: 1.5px solid currentColor; border-radius: 999px; padding: 1px 9px; }
+.rule.jurema { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--surface)); }
+.result.show .rule { animation: fadeUp .6s both; animation-delay: calc(1.2s + var(--i) * .2s); }
+.countdown { margin-top: 22px; padding: 18px 12px 14px; border-radius: 18px; background: color-mix(in srgb, var(--pine) 10%, transparent); border: 1px dashed color-mix(in srgb, var(--pine) 40%, transparent); text-align: center; }
+.countdown .title { font-weight: 700; margin-bottom: 12px; }
+.countdown .units { display: flex; justify-content: center; gap: 8px; }
+.countdown .unit { min-width: 64px; padding: 10px 4px 6px; border-radius: 12px; background: var(--surface); box-shadow: 0 0 0 2px var(--gold); }
+.countdown .num { display: block; font-family: "Young Serif", Georgia, serif; font-size: 1.9rem; line-height: 1; color: var(--berry); font-variant-numeric: tabular-nums; }
+.countdown .num.tick { animation: tickPop .35s ease-out; }
+@keyframes tickPop { from { transform: translateY(-6px); opacity: .3; } to { transform: none; opacity: 1; } }
+.countdown .lbl { display: block; font-size: .8rem; color: var(--muted); margin-top: 4px; }
+.countdown .when { font-size: .9rem; color: var(--muted); margin-top: 10px; }
+.countdown .today { font-family: "Young Serif", Georgia, serif; font-size: 1.6rem; color: var(--berry); }
+#orgView .countdown { margin-top: 0; animation: fadeUp .6s .55s both; }
 
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px); z-index: 50;
   background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; }
@@ -201,7 +220,9 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
       <p class="label">Você tirou</p>
       <p class="name" id="drawn"></p>
       <div class="after">
-        <p class="note">Dá uma olhada no grupo da família pra ver o que a pessoa contou sobre si e o que gostaria de ganhar. E bico calado até a troca! 🤫</p>
+        <p class="note" id="groupNote"></p>
+        <div class="rules" id="rules"></div>
+        <div class="countdown" data-countdown></div>
         <button class="ghost small replay" id="replay">Abrir de novo 🎁</button>
       </div>
     </div>
@@ -213,6 +234,7 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
   </section>
 
   <section id="orgView" class="stack" hidden>
+    <div class="countdown" data-countdown></div>
     <div class="panel stack">
       <h2>Quem participa</h2>
       <div class="family" id="names"></div>
@@ -243,6 +265,9 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
   const COLORS = ["#A8233A", "#1E4A37", "#C0822A", "#7A3B69", "#2F6E8A", "#B5523B"];
   const A = "0123456789abcdefghijklmnopqrstuvwxyz";
   const KEY = "martin-amigo-secreto-2026";
+  // Data e hora da troca (horário de Brasília)
+  const TROCA = new Date("2026-12-25T20:00:00-03:00");
+  const TROCA_TXT = "25 de dezembro, à noite";
   const n = NAMES.length;
   const $ = (id) => document.getElementById(id);
   const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -430,6 +455,23 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
     $("me").textContent = ""; $("me").appendChild(avatar(d.g));
     $("hello").textContent = "Oi, " + NAMES[d.g] + "! 🎅";
   }
+  function renderRules(name) {
+    const box = $("rules"); box.textContent = "";
+    const items = [
+      { ico: "🎁", title: "O presente", tag: "", text: "Escolhe um presente pra " + name + ", pensando no que a pessoa gosta." },
+      { ico: "🫶", title: "O Jurema", tag: "opcional", cls: "jurema",
+        text: "A tradição da nossa família: um presente feito à mão. Pode ser uma receita, um poema, um artesanato, qualquer coisa que tu faça e que transmita amor. Se quiser, prepara um Jurema pra " + name + " também!" }
+    ];
+    items.forEach((it, i) => {
+      const r = document.createElement("div"); r.className = "rule" + (it.cls ? " " + it.cls : ""); r.style.setProperty("--i", i);
+      const ico = document.createElement("span"); ico.className = "ico"; ico.textContent = it.ico; ico.setAttribute("aria-hidden", "true");
+      const body = document.createElement("div");
+      const h = document.createElement("h3"); h.textContent = it.title;
+      if (it.tag) { const t = document.createElement("span"); t.className = "tag"; t.textContent = it.tag; h.appendChild(t); }
+      const p = document.createElement("p"); p.textContent = it.text;
+      body.append(h, p); r.append(ico, body); box.appendChild(r);
+    });
+  }
   function spellName(name) {
     const el = $("drawn"); el.textContent = ""; el.setAttribute("aria-label", name);
     [...name].forEach((ch, i) => { const s = document.createElement("span"); s.textContent = ch; s.style.setProperty("--i", i); s.setAttribute("aria-hidden", "true"); el.appendChild(s); });
@@ -479,6 +521,8 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
     stage.classList.add("done");
     $("result").hidden = false; $("result").classList.add("show");
     spellName(NAMES[d.r]);
+    renderRules(NAMES[d.r]);
+    $("groupNote").textContent = "A descrição e a lista de desejos de " + NAMES[d.r] + " vão ser enviadas no grupo da família. Fica de olho! E bico calado até a troca 🤫";
     setTimeout(() => $("result").scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "nearest" }), 1200);
     setTimeout(() => burst(cx, cy, 60, 11, Math.PI * 2), 900);
   }
@@ -491,6 +535,40 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
   }
   $("gift").addEventListener("click", openGift);
   $("replay").addEventListener("click", resetGift);
+
+  /* ---------- Contagem regressiva ---------- */
+  function mountCountdowns() {
+    document.querySelectorAll("[data-countdown]").forEach((box) => {
+      if (box.dataset.ready) return; box.dataset.ready = "1";
+      const title = document.createElement("p"); title.className = "title"; title.textContent = "Falta pouco pra troca 🎄";
+      const units = document.createElement("div"); units.className = "units";
+      const parts = {};
+      [["d", "dias"], ["h", "horas"], ["m", "min"], ["s", "seg"]].forEach(([k, label]) => {
+        const u = document.createElement("div"); u.className = "unit";
+        const num = document.createElement("span"); num.className = "num"; num.textContent = "–";
+        const lbl = document.createElement("span"); lbl.className = "lbl"; lbl.textContent = label;
+        u.append(num, lbl); units.appendChild(u); parts[k] = num;
+      });
+      const when = document.createElement("p"); when.className = "when"; when.textContent = TROCA_TXT;
+      box.append(title, units, when);
+      function tick() {
+        const ms = TROCA - Date.now();
+        if (ms <= 0) {
+          box.textContent = "";
+          const t = document.createElement("p"); t.className = "today"; t.textContent = "Chegou a hora da troca! 🎁";
+          box.appendChild(t); return;
+        }
+        const v = { d: Math.floor(ms / 864e5), h: Math.floor(ms / 36e5) % 24, m: Math.floor(ms / 6e4) % 60, s: Math.floor(ms / 1e3) % 60 };
+        for (const k in v) {
+          const txt = k === "d" ? String(v[k]) : String(v[k]).padStart(2, "0");
+          if (parts[k].textContent !== txt) { parts[k].textContent = txt; parts[k].classList.remove("tick"); void parts[k].offsetWidth; parts[k].classList.add("tick"); }
+        }
+        setTimeout(tick, 1000 - (Date.now() % 1000));
+      }
+      tick();
+    });
+  }
+  mountCountdowns();
 
   /* ---------- Rotas ---------- */
   function route() {
