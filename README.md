@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/capa.jpg" alt="The Martins' Christmas" width="360">
+  <img src="capa.jpg" alt="The Martins' Christmas" width="360">
 </p>
 
 <h1 align="center">🎄 Amigo secreto dos Martin</h1>
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/familia.jpg" alt="Opa, Oma, Tina, Alessandro, Lua, Juan, Teteu, Débora, Daniel, Babi, Luli, Manu e Dé" width="100%">
+  <img src="familia.jpg" alt="Opa, Oma, Tina, Alessandro, Lua, Juan, Teteu, Débora, Daniel, Babi, Luli, Manu e Dé" width="100%">
 </p>
 
 ## 🎁 Quem participa
