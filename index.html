@@ -316,7 +316,7 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
     e.stopPropagation();
     soundOn = !soundOn; try { localStorage.setItem(KEY + ":som", soundOn ? "on" : "off"); } catch (err) {}
     paintSound();
-    if (soundOn) { tone(880, .08, "triangle", .08); music.start(); } else music.stop();
+    if (soundOn) { unlock(); tone(880, .08, "triangle", .08); } else { music.stop(); if (unlock.el) unlock.el.pause(); }
   });
   paintSound();
   function tone(freq, dur, type, vol, when) {
@@ -395,10 +395,35 @@ button:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outli
       }
     };
   })();
-  // A música começa no primeiro toque na página (os navegadores não deixam tocar antes disso)
-  function firstTouch() { removeEventListener("pointerdown", firstTouch); removeEventListener("keydown", firstTouch); if (soundOn) music.start(); }
-  addEventListener("pointerdown", firstTouch); addEventListener("keydown", firstTouch);
-  document.addEventListener("visibilitychange", () => { if (!actx) return; if (document.hidden) actx.suspend(); else actx.resume(); });
+  // A música começa no primeiro toque na página (os navegadores não deixam tocar antes disso).
+  // Continua tentando a cada toque até o áudio estar liberado de verdade (necessário no iPhone).
+  const SILENT = "data:audio/wav;base64,UklGRmQGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YUAGAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
+  const GESTURES = ["pointerdown", "touchend", "click", "keydown"];
+  function unlock() {
+    if (!soundOn) return;
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = "playback"; // toca mesmo com o iPhone no silencioso
+      // Truque pro iPhone: um <audio> silencioso em loop coloca a página no modo "reprodução de mídia",
+      // e aí o som do app toca mesmo com a chavinha do silencioso ligada.
+      if (!unlock.el) {
+        const el = document.createElement("audio");
+        el.src = SILENT; el.loop = true; el.setAttribute("playsinline", ""); el.setAttribute("x-webkit-airplay", "deny"); el.preload = "auto"; el.volume = 0.01;
+        unlock.el = el;
+      }
+      if (unlock.el.paused) { const pr = unlock.el.play(); if (pr && pr.catch) pr.catch(() => {}); }
+      const c = ctx();
+      const buf = c.createBuffer(1, 1, 22050), src = c.createBufferSource();
+      src.buffer = buf; src.connect(c.destination); src.start(0);
+      music.start();
+      if (c.state === "running") GESTURES.forEach((g) => removeEventListener(g, unlock, true));
+    } catch (e) {}
+  }
+  GESTURES.forEach((g) => addEventListener(g, unlock, true));
+  document.addEventListener("visibilitychange", () => {
+    if (!actx) return;
+    if (document.hidden) { actx.suspend(); if (unlock.el) unlock.el.pause(); }
+    else if (soundOn) { actx.resume(); if (unlock.el) { const pr = unlock.el.play(); if (pr && pr.catch) pr.catch(() => {}); } }
+  });
 
   /* ---------- Neve ---------- */
   (function snow() {
